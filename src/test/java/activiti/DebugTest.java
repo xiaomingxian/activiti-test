@@ -1,6 +1,7 @@
 package activiti;
 
 import boot.spring.Application;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.activiti.engine.RepositoryService;
 import org.activiti.engine.RuntimeService;
