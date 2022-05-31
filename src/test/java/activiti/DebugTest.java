@@ -1,14 +1,11 @@
 package activiti;
 
 import boot.spring.Application;
-import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.activiti.engine.RepositoryService;
 import org.activiti.engine.RuntimeService;
 import org.activiti.engine.impl.RepositoryServiceImpl;
 import org.activiti.engine.impl.persistence.entity.ProcessDefinitionEntity;
-import org.activiti.engine.repository.Deployment;
-import org.activiti.engine.repository.ProcessDefinition;
 import org.activiti.engine.runtime.ProcessInstance;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -17,7 +14,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.HashMap;
-import java.util.List;
 
 /**
  * @author 仙晓明
@@ -45,11 +41,6 @@ public class DebugTest {
     public void show() {
         String key = "applyNoneStoreSell_zidong";
 
-        List<Deployment> list = repositoryService.createDeploymentQuery()
-                .deploymentKey(key)
-                //.deploymentId(depId)
-                .list();
-        System.out.println(list);
     }
     @Test
     public void satrt(){
