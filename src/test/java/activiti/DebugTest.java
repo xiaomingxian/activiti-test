@@ -33,7 +33,7 @@ public class DebugTest {
     @Test
     public  void  depoloy(){
         repositoryService.createDeployment()
-                .addClasspathResource("processes/jiqiren.bpmn")
+                .addClasspathResource("processes/test1.bpmn")
                 .deploy();
 
     }
