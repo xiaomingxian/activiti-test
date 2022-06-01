@@ -2,17 +2,23 @@ package activiti;
 
 import activiti.model.PvmTransitionModel;
 import boot.spring.Application;
+import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.activiti.engine.ProcessEngineConfiguration;
 import org.activiti.engine.RepositoryService;
 import org.activiti.engine.RuntimeService;
+import org.activiti.engine.TaskService;
+import org.activiti.engine.form.AbstractFormType;
 import org.activiti.engine.impl.RepositoryServiceImpl;
 import org.activiti.engine.impl.bpmn.behavior.ExclusiveGatewayActivityBehavior;
+import org.activiti.engine.impl.form.DefaultTaskFormHandler;
+import org.activiti.engine.impl.form.FormPropertyHandler;
 import org.activiti.engine.impl.persistence.entity.ProcessDefinitionEntity;
 import org.activiti.engine.impl.pvm.PvmActivity;
 import org.activiti.engine.impl.pvm.PvmTransition;
 import org.activiti.engine.impl.pvm.delegate.ActivityBehavior;
 import org.activiti.engine.impl.pvm.process.ActivityImpl;
+import org.activiti.engine.impl.task.TaskDefinition;
 import org.activiti.engine.runtime.ProcessInstance;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
@@ -43,14 +49,26 @@ public class ParseAct {
     private RuntimeService runtimeService;
 
     @Autowired
-    private ProcessEngineConfiguration processEngineConfiguration;
+    private TaskService taskService;
 
-    String KEY = "varTest3";
+
+    static final String AND = "and";
+    static final String OR = "or";
+    static final String AND_EXP = "&&";
+    static final String OR_EXP = "||";
+    static final String EQUAL = "==";
+    static final String LT = "<";
+    static final String LT_EQ = "<=";
+    static final String GT = ">";
+    static final String GT_EQ = ">=";
+    static final String CONDITION_TEXT = "conditionText";
+
+    String KEY = "shichangbukehufenfa";
 
     @Test
     public void depoloy() {
         repositoryService.createDeployment()
-                .addClasspathResource("processes/varTest3.bpmn")
+                .addClasspathResource("processes/图.bpmn")
                 .deploy();
     }
 
@@ -58,78 +76,83 @@ public class ParseAct {
     public void start() {
 
         HashMap<String, Object> var = new HashMap<>();
-        var.put("k1", "2  ");
-        var.put("k2", "3");
+//        var.put("k1", "2  ");
+//        var.put("k2", "3");
         ProcessInstance processInstance = runtimeService.startProcessInstanceByKey(KEY, var);
 
         log.info("res:{}", processInstance);
     }
-
-    public static void main(String[] args) {
-//        || k7==8
-        String s = "${k1==1 and k2=='two' or k3==1.0 and (k4==9 or k5==10) && k6==5 || k7==8}";
-        ArrayList<String> keysCol = new ArrayList<>();
-        parseConditionKeys(Arrays.asList(s), keysCol);
-        log.info("res:{}", keysCol);
+    @Test
+    public void  completeTask(){
+        taskService.complete("95004");
     }
 
-    private static void parseConditionKeys(List<String> els, List list) {
-        for (String el : els) {
-            el = el.replaceAll("\\$\\{", "")
-                    .replaceAll("}", "")
-                    .replaceAll("\\(", "")
-                    .replaceAll("\\)", "")
-            ;
-            String[] elSplit = {};
-            if (el.contains("and")) {
-                elSplit = el.split("and");
-            } else if (el.contains("&&")) {
-                elSplit = el.split("&&");
-            } else if (el.contains("or")) {
-                elSplit = el.split("or");
-            } else if (el.contains("||")) {
-                elSplit = el.split("\\|\\|");
-            } else {
-                //todo > < >= <= 判断
-                String key = el.split("==")[0];
-                String keyTrim = key.trim();
-                if (!list.contains(key) && StringUtils.isNotEmpty(keyTrim)) {
-                    list.add(keyTrim);
-                }
-
-            }
-            parseConditionKeys(Arrays.asList(elSplit), list);
-        }
-    }
 
 
     @Test
     public void parse() {
-        ProcessDefinitionEntity deployedProcessDefinition = (ProcessDefinitionEntity) ((RepositoryServiceImpl) repositoryService).getDeployedProcessDefinition("myProcess:2:8");
-
-        List<ActivityImpl> activities = deployedProcessDefinition.getActivities();
-
+        ProcessDefinitionEntity deployedProcessDefinition = (ProcessDefinitionEntity) ((RepositoryServiceImpl) repositoryService).getDeployedProcessDefinition("shichangbukehufenfa:2:92517");
         String nodeId = "usertask1";
-        ActivityImpl currentNode = null;
+        PvmTransitionModel pvmTransitionModel = getPvmTransitionModel(deployedProcessDefinition, nodeId);
 
+        log.info("test:{}", pvmTransitionModel);
+    }
+
+    @Test
+    public void parseCurrent() {
+        String nodeId = "usertask1";
+
+        ProcessDefinitionEntity processDefinitionEntity = (ProcessDefinitionEntity) repositoryService
+                .getProcessDefinition("shichangbukehufenfa:2:92517");
+
+
+        ActivityImpl activityImpl = processDefinitionEntity.findActivity(nodeId);
+
+        TaskDefinition taskDef = (TaskDefinition) activityImpl.getProperties().get("taskDefinition");
+
+        DefaultTaskFormHandler fh = (DefaultTaskFormHandler) taskDef.getTaskFormHandler();
+
+        List<FormPropertyHandler> flList = fh == null ? null : (List<FormPropertyHandler>) fh.getFormPropertyHandlers();
+        //获取表单
+        if (flList != null) {
+            for (FormPropertyHandler formPropertyHandler : flList) {
+                log.info("form信息:{}", JSON.toJSONString(formPropertyHandler));
+            }
+        }
+        log.info("test:{}", activityImpl);
+    }
+
+    public PvmTransitionModel getPvmTransitionModel(ProcessDefinitionEntity deployedProcessDefinition, String nodeId) {
+        List<ActivityImpl> activities = deployedProcessDefinition.getActivities();
+        ActivityImpl currentNode = null;
         for (ActivityImpl act : activities) {
             String id = act.getId();
             if (nodeId.equals(id)) {
                 currentNode = act;
             }
         }
-
         List<PvmTransition> outgoingTransitions = currentNode.getOutgoingTransitions();
-        PvmTransitionModel pvmTransitionModel = PvmTransitionModel.builder().keys(new ArrayList<>()).otherLine(new ArrayList<>()).build();
+        PvmTransitionModel pvmTransitionModel = null;
         if (outgoingTransitions.size() == 1) {
             PvmActivity destination = outgoingTransitions.get(0).getDestination();
-            getAllControlKeys(destination, pvmTransitionModel);
+            pvmTransitionModel = getAllControlKeys(destination);
         }
-
-        log.info("test:{}", pvmTransitionModel);
-
-
+        return pvmTransitionModel;
     }
+
+
+    /**
+     * 收集userTask后的所有条件key
+     *
+     * @param destinationl
+     * @return
+     */
+    private PvmTransitionModel getAllControlKeys(PvmActivity destinationl) {
+        PvmTransitionModel pvmTransitionModel = PvmTransitionModel.builder().keys(new ArrayList<>()).otherLine(new ArrayList<>()).build();
+        getAllControlKeys(destinationl, pvmTransitionModel);
+        return pvmTransitionModel;
+    }
+
 
     /**
      * 收集userTask后的所有条件key
@@ -145,8 +168,8 @@ public class ParseAct {
                 //获取发出的连线
                 List<PvmTransition> outgoingTransitions = dest.getOutgoingTransitions();
                 for (PvmTransition outgoingTransition : outgoingTransitions) {
-                    String conditionText = outgoingTransition.getProperty("conditionText").toString();
-                    pvmTransitionModel.getKeys().add(conditionText);
+                    String conditionText = outgoingTransition.getProperty(CONDITION_TEXT).toString();
+                    parseConditionKeys(Arrays.asList(conditionText), pvmTransitionModel.getKeys());
                     PvmTransitionModel pvmTransitionModelOther = PvmTransitionModel.builder().keys(new ArrayList<>()).otherLine(new ArrayList<>()).build();
                     pvmTransitionModel.getOtherLine().add(pvmTransitionModelOther);
                     PvmActivity destinationOther = outgoingTransition.getDestination();
@@ -154,6 +177,51 @@ public class ParseAct {
                 }
             }
         }
+    }
+
+    private static void parseConditionKeys(List<String> els, List list) {
+
+
+        for (String el : els) {
+            el = el.replaceAll("\\$\\{", "")
+                    .replaceAll("}", "")
+                    .replaceAll("\\(", "")
+                    .replaceAll("\\)", "")
+            ;
+            String[] elSplit = {};
+            if (el.contains(AND)) {
+                elSplit = el.split(AND);
+            } else if (el.contains(AND_EXP)) {
+                elSplit = el.split(AND_EXP);
+            } else if (el.contains(OR)) {
+                elSplit = el.split(OR);
+            } else if (el.contains(OR_EXP)) {
+                elSplit = el.split("\\|\\|");
+            } else {
+                String keyTrim = null;
+                if (el.contains(EQUAL)) {
+                    keyTrim = el.split(EQUAL)[0].trim();
+                } else if (el.contains(GT_EQ)) {
+                    keyTrim = el.split(GT_EQ)[0].trim();
+                } else if (el.contains(LT_EQ)) {
+                    keyTrim = el.split(LT_EQ)[0].trim();
+                } else if (el.contains(LT) && !el.contains("=")) {
+                    keyTrim = el.split(LT)[0].trim();
+                } else if (el.contains(GT) && !el.contains("=")) {
+                    keyTrim = el.split(GT)[0].trim();
+                }
+                if (keyTrim != null && !list.contains(keyTrim) && StringUtils.isNotEmpty(keyTrim)) {
+                    list.add(keyTrim);
+                }
+            }
+            parseConditionKeys(Arrays.asList(elSplit), list);
+        }
+    }
+
+    public static List<String> parseConditionKeys(String el) {
+        List<String> list = new ArrayList<>();
+        parseConditionKeys(Arrays.asList(el), list);
+        return list;
     }
 
 }
