@@ -1,28 +1,34 @@
 package activiti;
 
+import activiti.model.FormProperty;
 import activiti.model.PvmTransitionModel;
 import boot.spring.Application;
 import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
-import org.activiti.engine.ProcessEngineConfiguration;
+import org.activiti.engine.FormService;
 import org.activiti.engine.RepositoryService;
 import org.activiti.engine.RuntimeService;
 import org.activiti.engine.TaskService;
-import org.activiti.engine.form.AbstractFormType;
+import org.activiti.engine.delegate.Expression;
+import org.activiti.engine.form.TaskFormData;
 import org.activiti.engine.impl.RepositoryServiceImpl;
 import org.activiti.engine.impl.bpmn.behavior.ExclusiveGatewayActivityBehavior;
 import org.activiti.engine.impl.form.DefaultTaskFormHandler;
 import org.activiti.engine.impl.form.FormPropertyHandler;
+import org.activiti.engine.impl.form.FormPropertyImpl;
+import org.activiti.engine.impl.form.TaskFormDataImpl;
 import org.activiti.engine.impl.persistence.entity.ProcessDefinitionEntity;
 import org.activiti.engine.impl.pvm.PvmActivity;
 import org.activiti.engine.impl.pvm.PvmTransition;
 import org.activiti.engine.impl.pvm.delegate.ActivityBehavior;
 import org.activiti.engine.impl.pvm.process.ActivityImpl;
 import org.activiti.engine.impl.task.TaskDefinition;
+import org.activiti.engine.repository.ProcessDefinition;
 import org.activiti.engine.runtime.ProcessInstance;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
@@ -51,6 +57,9 @@ public class ParseAct {
     @Autowired
     private TaskService taskService;
 
+    @Autowired
+    private FormService formService;
+
 
     static final String AND = "and";
     static final String OR = "or";
@@ -63,13 +72,17 @@ public class ParseAct {
     static final String GT_EQ = ">=";
     static final String CONDITION_TEXT = "conditionText";
 
-    String KEY = "shichangbukehufenfa";
+    String KEY = "lizhiShenqing_kehcg";
+    String DEF_ID = "shichangbukehufenfa:8:112517";
 
     @Test
     public void depoloy() {
         repositoryService.createDeployment()
-                .addClasspathResource("processes/图.bpmn")
+                .addClasspathResource("processes/test.bpmn")
                 .deploy();
+
+        List<ProcessDefinition> list = repositoryService.createProcessDefinitionQuery().processDefinitionKey(KEY).orderByProcessDefinitionId().desc().list();
+        log.info("res:{}",list);
     }
 
     @Test
@@ -82,28 +95,45 @@ public class ParseAct {
 
         log.info("res:{}", processInstance);
     }
+
     @Test
-    public void  completeTask(){
-        taskService.complete("95004");
+    public void  getForm(){
+//        115004
+        TaskFormData taskFormData = formService.getTaskFormData("115004");
+        ArrayList<FormPropertyImpl> formProperties = (ArrayList) ((TaskFormDataImpl) taskFormData).getFormProperties();
+
+
+        log.info("taskForm:{}",taskFormData);
     }
+    @Test
+    public void  completeTask() {
+//135008
+//135011
+//135014
+        HashMap<String, Object> var = new HashMap<>();
+        var.put("new_property_1","无未归档合同");
 
-
+        taskService.complete("142503",var);
+//        taskService.complete("135008");
+//        taskService.complete("135014");
+    }
 
     @Test
     public void parse() {
-        ProcessDefinitionEntity deployedProcessDefinition = (ProcessDefinitionEntity) ((RepositoryServiceImpl) repositoryService).getDeployedProcessDefinition("shichangbukehufenfa:2:92517");
+        ProcessDefinitionEntity deployedProcessDefinition = (ProcessDefinitionEntity) ((RepositoryServiceImpl) repositoryService).getDeployedProcessDefinition("shichangbukehufenfa:4:105017");
         String nodeId = "usertask1";
         PvmTransitionModel pvmTransitionModel = getPvmTransitionModel(deployedProcessDefinition, nodeId);
 
         log.info("test:{}", pvmTransitionModel);
     }
-
     @Test
     public void parseCurrent() {
+
+
         String nodeId = "usertask1";
 
         ProcessDefinitionEntity processDefinitionEntity = (ProcessDefinitionEntity) repositoryService
-                .getProcessDefinition("shichangbukehufenfa:2:92517");
+                .getProcessDefinition(DEF_ID);
 
 
         ActivityImpl activityImpl = processDefinitionEntity.findActivity(nodeId);
@@ -116,10 +146,21 @@ public class ParseAct {
         //获取表单
         if (flList != null) {
             for (FormPropertyHandler formPropertyHandler : flList) {
+                //id
+                String id = formPropertyHandler.getId();
+                //name
+                String name = formPropertyHandler.getName();
+                //表达式
+                String variableExpression = formPropertyHandler.getVariableExpression().toString();
+                //角色组
+                String variableName = formPropertyHandler.getVariableName();
+                FormProperty formProperty = new FormProperty();
+                formProperty.setVariableExpression(variableExpression);
+                BeanUtils.copyProperties(formPropertyHandler,formProperty);
                 log.info("form信息:{}", JSON.toJSONString(formPropertyHandler));
+                log.info("formProperty:{}", JSON.toJSONString(formProperty));
             }
         }
-        log.info("test:{}", activityImpl);
     }
 
     public PvmTransitionModel getPvmTransitionModel(ProcessDefinitionEntity deployedProcessDefinition, String nodeId) {
